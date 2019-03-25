@@ -83,7 +83,8 @@ void StrToPriKey(const std::string& strPriKey, ECCPRIVATEKEYBLOB &eccPriKeyBlob)
 	eccPriKeyBlob.BitLen = ECC_MAX_MODULUS_BITS_LEN / 2;
 }
 
-void StrToSignarure(const std::string& strR, const std::string& strS, ECCSIGNATUREBLOB& signature)
+void StrToSignarure(const std::string& strR, const std::string& strS,
+	ECCSIGNATUREBLOB& signature)
 {
 	memcpy(signature.r + KEY_OFF_SET, strR.c_str(), SM2_KEY_LEN);
 	memcpy(signature.s + KEY_OFF_SET, strS.c_str(), SM2_KEY_LEN);
@@ -149,6 +150,8 @@ void CSM2CheckToolDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT_ENCRYPT_RES, m_EncryptResEdit);
 	DDX_Control(pDX, IDC_EDIT_DECRYPT_RES, m_DecryptResEdit);
 	DDX_Control(pDX, IDC_COMBO_ENCRYPT_MOD, m_CryptModCob);
+	DDX_Control(pDX, IDC_EDIT_ENCRYPT_PUBKEY, m_PubKeyEncEdit);
+	DDX_Control(pDX, IDC_EDIT_DECRYPT_PRIKEY, m_PriKeyDecEdit);
 }
 
 BEGIN_MESSAGE_MAP(CSM2CheckToolDlg, CDialogEx)
@@ -161,6 +164,8 @@ BEGIN_MESSAGE_MAP(CSM2CheckToolDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_SM3, &CSM2CheckToolDlg::OnBnClickedButtonSm3)
 	ON_BN_CLICKED(IDC_BUTTON_SM4_ENCRYPT, &CSM2CheckToolDlg::OnBnClickedButtonSm4Encrypt)
 	ON_BN_CLICKED(IDC_BUTTON_SM4_DECRYPT, &CSM2CheckToolDlg::OnBnClickedButtonSm4Decrypt)
+	ON_BN_CLICKED(IDC_BUTTON_PUBKEY_ENC, &CSM2CheckToolDlg::OnBnClickedButtonPubkeyEnc)
+	ON_BN_CLICKED(IDC_BUTTON_PRIKEY_DEC, &CSM2CheckToolDlg::OnBnClickedButtonPrikeyDec)
 END_MESSAGE_MAP()
 
 
@@ -261,132 +266,7 @@ HCURSOR CSM2CheckToolDlg::OnQueryDragIcon()
 }
 
 
-void CSM2CheckToolDlg::OnBnClickedButtonGenKey()
-{
-	// TODO:  在此添加控件通知处理程序代码;
-	ECCPRIVATEKEYBLOB priKey = {};
-	ECCPUBLICKEYBLOB pubKey = {};
-	ULONG ulRes = TG_GenECCKeyPair(0, &priKey, &pubKey);
-	if (0 == ulRes)
-	{
-		string strTmp = ESP_CharToHex(priKey.PrivateKey + KEY_OFF_SET, SM2_KEY_LEN);
-		SetEditString(m_PriKeyEdit, strTmp, "GenKey_PriKey");
-
-		strTmp = ESP_CharToHex(pubKey.XCoordinate + KEY_OFF_SET, SM2_KEY_LEN);
-		SetEditString(m_PubKeyXEdit, strTmp, "GenKey_PubKeyX");
-
-		strTmp = ESP_CharToHex(pubKey.YCoordinate + KEY_OFF_SET, SM2_KEY_LEN);
-		SetEditString(m_PubKeyYEdit, strTmp, "GenKey_PubKeyY");
-	}
-	ShowMessage(L"TG_GenECCKeyPair", ulRes);
-}
-
-void CSM2CheckToolDlg::OnBnClickedButtonSign()
-{
-	// TODO:  在此添加控件通知处理程序代码;
-	string strDigest = GetEditString(m_SM3ZResEdit, true, "Sign_SM3Z");
-	if (0 == strDigest.length()){
-		OnBnClickedButtonSm3();
-	}
-	strDigest = GetEditString(m_SM3ZResEdit, true, "Sign_SM3Z");
-	if (0 < strDigest.length())
-	{
-		ECCPRIVATEKEYBLOB eccPriKeyBlob = {};
-		ECCSIGNATUREBLOB signature = {};
-		string strPriKey = GetEditString(m_PriKeyEdit, true, "Sign_PriKey");
-		StrToPriKey(strPriKey, eccPriKeyBlob);
-		ULONG ulRes = TG_ECCSign(&eccPriKeyBlob, (BYTE*)strDigest.c_str(), strDigest.length(), &signature);
-		ShowMessage(L"TG_ECCSign", ulRes);
-		if (0 == ulRes)
-		{
-			string strTmp = ESP_CharToHex(signature.r + KEY_OFF_SET, SM2_KEY_LEN);
-			SetEditString(m_SignResR, strTmp, "Sign_R");
-
-			strTmp = ESP_CharToHex(signature.s + KEY_OFF_SET, SM2_KEY_LEN);
-			SetEditString(m_SignResS, strTmp, "Sign_S");
-		}
-	}
-	else{
-		ShowMessage(L"Digest is empty", -1);
-	}
-}
-
-void CSM2CheckToolDlg::OnBnClickedButtonVerify()
-{
-	// TODO:  在此添加控件通知处理程序代码;
-	string strDigest = GetEditString(m_SM3ZResEdit, true, "Verify_SM3Z");
-	if (0 == strDigest.length()){
-		OnBnClickedButtonSm3();
-	}
-	strDigest = GetEditString(m_SM3ZResEdit, true, "Verify_SM3Z");
-	if (0 < strDigest.length())
-	{
-		ECCPUBLICKEYBLOB pubKey = {};
-		ECCSIGNATUREBLOB signature = {};
-		string strX = GetEditString(m_PubKeyXEdit, true, "Verify_PubKeyX");
-		string strY = GetEditString(m_PubKeyYEdit, true, "Verify_PubKeyY");
-		StrToPubKey(strX, strY, pubKey);
-		string strR = GetEditString(m_SignResR, true, "Verify_SignValueR");
-		string strS = GetEditString(m_SignResS, true, "Verify_SignValueS");
-		StrToSignarure(strR, strS, signature);
-		ULONG ulRes = TG_ECCVerify(&pubKey, (BYTE*)strDigest.c_str(), strDigest.length(), &signature);
-		ShowMessage(L"TG_ECCVerify", ulRes);
-		SetEditString(m_VerifyRes, std::to_string(ulRes), "Verify_Res");
-	}
-	else{
-		ShowMessage(L"Digest is empty", -1);
-	}
-}
-
-void CSM2CheckToolDlg::OnBnClickedButtonSm3()
-{
-	//TODO:  在此添加控件通知处理程序代码;
-	BOOL isHasZ = FALSE;
-	for (int i = 0; i < 2; ++i)
-	{
-		if (1 == i){
-			isHasZ = TRUE;
-		}
-		HANDLE hHash = NULL;
-		ULONG ulRes = 0;
-		if (isHasZ)
-		{
-			ECCPUBLICKEYBLOB pubKey = {};
-			string strX = GetEditString(m_PubKeyXEdit, true, "SM3_PubKeyX");
-			string strY = GetEditString(m_PubKeyYEdit, true, "SM3_PubKeyY");
-			StrToPubKey(strX, strY, pubKey);
-			string userID = GetEditString(m_UserIDEdit, true, "SM3_UserID");
-			ulRes = TG_DigestInit(SGD_SM3, &pubKey,
-				(BYTE*)userID.c_str(), userID.length(), &hHash);
-		}
-		else{
-			ulRes = TG_DigestInit(SGD_SM3, NULL, NULL, 0, &hHash);
-		}
-		ShowMessage(L"TG_DigestInit", ulRes);
-		if (0 == ulRes)
-		{
-			string srcData = GetEditString(m_SrcEdit, true, "SM3_Src");
-			BYTE szDigest[ECC_MAX_MODULUS_BITS_LEN] = {};
-			ULONG ulDigestLen = _countof(szDigest);
-			ulRes = TG_Digest(hHash, (BYTE*)srcData.c_str(), srcData.length(),
-				szDigest, &ulDigestLen);
-			ShowMessage(L"TG_Digest", ulRes);
-			if (0 == ulRes)
-			{
-				string strTmp = ESP_CharToHex(szDigest, ulDigestLen);
-				if (isHasZ){
-					SetEditString(m_SM3ZResEdit, strTmp, "SM3_SM3Z");
-				}
-				else{
-					SetEditString(m_SM3ResEdit, strTmp, "SM3_SM3");
-				}
-			}
-			TG_CloseHandle(hHash, 0);
-		}
-	}
-}
-
-void CSM2CheckToolDlg::ShowMessage(CString name, LONG errorCode,
+void CSM2CheckToolDlg::ShowMessage(CString name, LONG errorCode /* = -1 */,
 	CString msg /* = L"" */, int flag /* = 0 */ )
 {
 	if (flag == 1){
@@ -394,7 +274,10 @@ void CSM2CheckToolDlg::ShowMessage(CString name, LONG errorCode,
 	}
 	CString strMsg;
 	if (-1 == errorCode)
+	{
+		LOGW_ERROR(name.GetBuffer());
 		strMsg = name + L"\r\n";
+	}
 	else if (0 == errorCode)
 		strMsg.Format(L"%s成功:%s\r\n", name, msg);
 	else
@@ -405,7 +288,8 @@ void CSM2CheckToolDlg::ShowMessage(CString name, LONG errorCode,
 	m_ResultEdit.ReplaceSel(strMsg);
 }
 
-std::string CSM2CheckToolDlg::GetEditString(const CEdit& et, bool isHex, const std::string& logName)
+std::string CSM2CheckToolDlg::GetEditString(const CEdit& et,
+	bool isHex, const std::string& logName)
 {
 	std::string strRes;
 	CString cstr;
@@ -418,7 +302,8 @@ std::string CSM2CheckToolDlg::GetEditString(const CEdit& et, bool isHex, const s
 	return strRes;
 }
 
-void CSM2CheckToolDlg::SetEditString(CEdit& et, const std::string& text, const std::string& logName)
+void CSM2CheckToolDlg::SetEditString(CEdit& et,
+	const std::string& text, const std::string& logName)
 {
 	CString cstr = CString(text.c_str());
 	et.SetWindowTextW(cstr);
@@ -457,6 +342,157 @@ LONG CSM2CheckToolDlg::GetSymMod(BLOCKCIPHERPARAM& blolparam)
 		memcpy(blolparam.IV, symIV.c_str(), blolparam.IVLen);
 	}
 	return lCryptMod;
+}
+
+void CSM2CheckToolDlg::GetPubKey(ECCPUBLICKEYBLOB& pubKey,
+	const std::string& logName)
+{
+	string strX = GetEditString(m_PubKeyXEdit, true, logName + "PubKeyX");
+	string strY = GetEditString(m_PubKeyYEdit, true, logName + "PubKeyY");
+	StrToPubKey(strX, strY, pubKey);
+}
+
+void CSM2CheckToolDlg::GetPriKey(ECCPRIVATEKEYBLOB& priKey,
+	const std::string& logName)
+{
+	string strPriKey = GetEditString(m_PriKeyEdit, true, logName + "PriKey");
+	StrToPriKey(strPriKey, priKey);
+}
+
+void CSM2CheckToolDlg::ShowCipherText(PECCCIPHERBLOB pCipherText, const std::string& logName)
+{
+	CString msg = CString(logName.c_str());
+	string strTmp = ESP_CharToHex(pCipherText->XCoordinate + KEY_OFF_SET, SM2_KEY_LEN);
+	ShowMessage(msg + CString("XCoordinate:") + CString(strTmp.c_str()));
+	strTmp = ESP_CharToHex(pCipherText->YCoordinate + KEY_OFF_SET, SM2_KEY_LEN);
+	ShowMessage(msg + CString("YCoordinate:") + CString(strTmp.c_str()));
+	strTmp = ESP_CharToHex(pCipherText->HASH, _countof(pCipherText->HASH));
+	ShowMessage(msg + CString("HASH:") + CString(strTmp.c_str()));
+	ShowMessage(msg + CString("CipherLen:") + CString(to_string(pCipherText->CipherLen).c_str()));
+	strTmp = ESP_CharToHex(pCipherText->Cipher, pCipherText->CipherLen);
+	ShowMessage(msg + CString("Cipher:") + CString(strTmp.c_str()));
+}
+
+void CSM2CheckToolDlg::OnBnClickedButtonGenKey()
+{
+	// TODO:  在此添加控件通知处理程序代码;
+	ECCPRIVATEKEYBLOB priKey = {};
+	ECCPUBLICKEYBLOB pubKey = {};
+	ULONG ulRes = TG_GenECCKeyPair(0, &priKey, &pubKey);
+	if (0 == ulRes)
+	{
+		string strTmp = ESP_CharToHex(priKey.PrivateKey + KEY_OFF_SET, SM2_KEY_LEN);
+		SetEditString(m_PriKeyEdit, strTmp, "GenKey_PriKey");
+
+		strTmp = ESP_CharToHex(pubKey.XCoordinate + KEY_OFF_SET, SM2_KEY_LEN);
+		SetEditString(m_PubKeyXEdit, strTmp, "GenKey_PubKeyX");
+
+		strTmp = ESP_CharToHex(pubKey.YCoordinate + KEY_OFF_SET, SM2_KEY_LEN);
+		SetEditString(m_PubKeyYEdit, strTmp, "GenKey_PubKeyY");
+	}
+	ShowMessage(L"TG_GenECCKeyPair", ulRes);
+}
+
+void CSM2CheckToolDlg::OnBnClickedButtonSign()
+{
+	// TODO:  在此添加控件通知处理程序代码;
+	string strDigest = GetEditString(m_SM3ZResEdit, true, "Sign_SM3Z");
+	if (0 == strDigest.length()){
+		OnBnClickedButtonSm3();
+	}
+	strDigest = GetEditString(m_SM3ZResEdit, true, "Sign_SM3Z");
+	if (0 < strDigest.length())
+	{
+		ECCPRIVATEKEYBLOB priKey = {};
+		GetPriKey(priKey, "Sign_");
+		ECCSIGNATUREBLOB signature = {};
+		ULONG ulRes = TG_ECCSign(&priKey,
+			(BYTE*)strDigest.c_str(), strDigest.length(), &signature);
+		ShowMessage(L"TG_ECCSign", ulRes);
+		if (0 == ulRes)
+		{
+			string strTmp = ESP_CharToHex(signature.r + KEY_OFF_SET, SM2_KEY_LEN);
+			SetEditString(m_SignResR, strTmp, "Sign_R");
+
+			strTmp = ESP_CharToHex(signature.s + KEY_OFF_SET, SM2_KEY_LEN);
+			SetEditString(m_SignResS, strTmp, "Sign_S");
+		}
+	}
+	else{
+		ShowMessage(L"Digest is empty");
+	}
+}
+
+void CSM2CheckToolDlg::OnBnClickedButtonVerify()
+{
+	// TODO:  在此添加控件通知处理程序代码;
+	string strDigest = GetEditString(m_SM3ZResEdit, true, "Verify_SM3Z");
+	if (0 == strDigest.length()){
+		OnBnClickedButtonSm3();
+	}
+	strDigest = GetEditString(m_SM3ZResEdit, true, "Verify_SM3Z");
+	if (0 < strDigest.length())
+	{
+		ECCPUBLICKEYBLOB pubKey = {};
+		GetPubKey(pubKey, "Verify_");
+		ECCSIGNATUREBLOB signature = {};
+		string strR = GetEditString(m_SignResR, true, "Verify_SignValueR");
+		string strS = GetEditString(m_SignResS, true, "Verify_SignValueS");
+		StrToSignarure(strR, strS, signature);
+		ULONG ulRes = TG_ECCVerify(&pubKey,
+			(BYTE*)strDigest.c_str(), strDigest.length(), &signature);
+		ShowMessage(L"TG_ECCVerify", ulRes);
+		SetEditString(m_VerifyRes, std::to_string(ulRes), "Verify_Res");
+	}
+	else{
+		ShowMessage(L"Digest is empty");
+	}
+}
+
+void CSM2CheckToolDlg::OnBnClickedButtonSm3()
+{
+	//TODO:  在此添加控件通知处理程序代码;
+	BOOL isHasZ = FALSE;
+	for (int i = 0; i < 2; ++i)
+	{
+		if (1 == i){
+			isHasZ = TRUE;
+		}
+		HANDLE hHash = NULL;
+		ULONG ulRes = 0;
+		if (isHasZ)
+		{
+			ECCPUBLICKEYBLOB pubKey = {};
+			GetPubKey(pubKey, "SM3_");
+			string userID = GetEditString(m_UserIDEdit, true, "SM3_UserID");
+			ulRes = TG_DigestInit(SGD_SM3, &pubKey,
+				(BYTE*)userID.c_str(), userID.length(), &hHash);
+		}
+		else{
+			ulRes = TG_DigestInit(SGD_SM3, NULL, NULL, 0, &hHash);
+		}
+		ShowMessage(L"TG_DigestInit", ulRes);
+		if (0 == ulRes)
+		{
+			string srcData = GetEditString(m_SrcEdit, true, "SM3_Src");
+			BYTE szDigest[ECC_MAX_MODULUS_BITS_LEN] = {};
+			ULONG ulDigestLen = _countof(szDigest);
+			ulRes = TG_Digest(hHash, (BYTE*)srcData.c_str(), srcData.length(),
+				szDigest, &ulDigestLen);
+			ShowMessage(L"TG_Digest", ulRes);
+			if (0 == ulRes)
+			{
+				string strTmp = ESP_CharToHex(szDigest, ulDigestLen);
+				if (isHasZ){
+					SetEditString(m_SM3ZResEdit, strTmp, "SM3_SM3Z");
+				}
+				else{
+					SetEditString(m_SM3ResEdit, strTmp, "SM3_SM3");
+				}
+			}
+			TG_CloseHandle(hHash, 0);
+		}
+	}
 }
 
 void CSM2CheckToolDlg::OnBnClickedButtonSm4Encrypt()
@@ -524,7 +560,8 @@ void CSM2CheckToolDlg::OnBnClickedButtonSm4Decrypt()
 			string encryptRes = GetEditString(m_EncryptResEdit, true, "SM4Decrypt_EncRes");
 			ULONG ulLen = encryptRes.length() + 128;
 			BYTE* pData = new BYTE[ulLen];
-			lRes = TG_Decrypt(hKey, (BYTE*)encryptRes.c_str(), encryptRes.length(), pData, &ulLen);
+			lRes = TG_Decrypt(hKey,
+				(BYTE*)encryptRes.c_str(), encryptRes.length(), pData, &ulLen);
 			if (0 == lRes)
 			{
 				string strTmp = ESP_CharToHex(pData, ulLen);
@@ -535,4 +572,44 @@ void CSM2CheckToolDlg::OnBnClickedButtonSm4Decrypt()
 		}
 		TG_CloseHandle(hKey, 0);
 	}
+}
+
+void CSM2CheckToolDlg::OnBnClickedButtonPubkeyEnc()
+{
+	// TODO:  在此添加控件通知处理程序代码;
+	ECCPUBLICKEYBLOB pubKey = {};
+	GetPubKey(pubKey, "PubkeyEnc_");
+	string src = GetEditString(m_SrcEdit, true, "PubkeyEnc_Src");
+	int cipherLen = sizeof(ECCCIPHERBLOB) + src.length() + SM2_KEY_LEN;
+	PECCCIPHERBLOB pCipherText = (PECCCIPHERBLOB)malloc(cipherLen);
+	memset(pCipherText, 0, cipherLen);
+	LONG lRes = TG_ECCPubKeyEncrypt(&pubKey, (BYTE*)src.c_str(), src.length(), pCipherText);
+	if (0 == lRes)
+	{
+		ShowCipherText(pCipherText, "PubkeyEnc_");
+		cipherLen = sizeof(ECCCIPHERBLOB)+pCipherText->CipherLen;
+		string strTmp = ESP_CharToHex((BYTE*)pCipherText, cipherLen);
+		SetEditString(m_PubKeyEncEdit, strTmp, "PubkeyEnc_Res");
+	}
+	free(pCipherText);
+	ShowMessage(L"TG_ECCPubKeyEncrypt", lRes);
+}
+
+void CSM2CheckToolDlg::OnBnClickedButtonPrikeyDec()
+{
+	// TODO:  在此添加控件通知处理程序代码;
+	ECCPRIVATEKEYBLOB priKey = {};
+	GetPriKey(priKey, "PrikeyDec_");
+	string cipherText = GetEditString(m_PubKeyEncEdit, true, "PrikeyDec_PubKeyEncRes");
+	PECCCIPHERBLOB pCipherText = (PECCCIPHERBLOB)cipherText.c_str();
+	ShowCipherText(pCipherText, "PrikeyDec_");
+	ULONG ulLen = pCipherText->CipherLen;
+	BYTE* pData = new BYTE[ulLen];
+	LONG lRes = TG_ECCPriKeyDecrypt(&priKey, pCipherText, pData, &ulLen);
+	if (0 == lRes)
+	{
+		string strTmp = ESP_CharToHex((BYTE*)pData, ulLen);
+		SetEditString(m_PriKeyDecEdit, strTmp, "PrikeyDec_Res");
+	}
+	ShowMessage(L"TG_ECCPriKeyDecrypt", lRes);
 }

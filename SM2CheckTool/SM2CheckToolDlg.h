@@ -33,10 +33,13 @@ protected:
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 
-	void ShowMessage(CString name, LONG errorCode, CString msg = L"", int flag = 0 );
+	void ShowMessage(CString name, LONG errorCode = -1, CString msg = L"", int flag = 0 );
 	std::string GetEditString(const CEdit& et, bool isHex, const std::string& logName);
 	void SetEditString(CEdit& et, const std::string& text, const std::string& logName);
 	LONG GetSymMod(BLOCKCIPHERPARAM& blolparam);
+	void GetPubKey(ECCPUBLICKEYBLOB& pubKey, const std::string& logName);
+	void GetPriKey(ECCPRIVATEKEYBLOB& priKey, const std::string& logName);
+	void ShowCipherText(PECCCIPHERBLOB pCipherText, const std::string& logName);
 public:
 	afx_msg void OnBnClickedButtonGenKey();
 	afx_msg void OnBnClickedButtonSign();
@@ -60,4 +63,8 @@ public:
 	CEdit m_EncryptResEdit;
 	CEdit m_DecryptResEdit;
 	CComboBox m_CryptModCob;
+	CEdit m_PubKeyEncEdit;
+	CEdit m_PriKeyDecEdit;
+	afx_msg void OnBnClickedButtonPubkeyEnc();
+	afx_msg void OnBnClickedButtonPrikeyDec();
 };
