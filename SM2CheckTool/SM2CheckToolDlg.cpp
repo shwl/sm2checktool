@@ -22,8 +22,33 @@ using namespace std;
 #define SM4_KEY_LEN		16
 #define SM4_IV_LEN		16
 
+bool ReadData(const char* fileName, char* data, int* len)
+{
+	bool bRes = false;
+	FILE *file = NULL;
+	fopen_s(&file, fileName, "a+");
+	if (file != NULL)
+	{
+		*len = fread_s(data, *len, 1, 1024, file);
+		fclose(file);
+		bRes = true;
+	}
+	return bRes;
+}
+
 std::string ESP_CharToHex(const BYTE* data, int len)
 {
+	std::string strTmp;
+	int nLen = len * 2 + 128;
+	char* pData = (char*)malloc(nLen);
+	memset(pData, 0, nLen);
+	for (unsigned int i = 0; i < len; ++i)
+	{
+		sprintf_s(pData + i * 2, 4, "%02x", (unsigned char)data[i]);
+	}
+	strTmp = pData;
+	free(pData);
+
 	std::string hexStr;
 	char szbuf[4] = { 0 };
 	for (unsigned int i = 0; i < len; ++i)
@@ -31,7 +56,7 @@ std::string ESP_CharToHex(const BYTE* data, int len)
 		sprintf_s(szbuf, 4, "%02x", (unsigned char)data[i]);
 		hexStr.append(szbuf, 2);
 	}
-
+	assert(0 == strTmp.compare(hexStr));
 	return hexStr;
 }
 

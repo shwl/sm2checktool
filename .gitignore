@@ -33,3 +33,4 @@ ipch/
 TGTestAll/resources/out/
 TGTestAll/resources/bomtest.xml/
 /setup/
+*tg_gmssl*
