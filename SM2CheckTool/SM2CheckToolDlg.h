@@ -33,7 +33,9 @@ protected:
 	DECLARE_MESSAGE_MAP()
 
 	void ShowMessage(CString name, LONG errorCode, CString msg = L"", int flag = 0 );
-	std::string GetEditString(const CEdit& et, bool isHex);
+	std::string GetEditString(const CEdit& et, bool isHex, const std::string& logName);
+	void SetEditString(CEdit& et, const std::string& text, const std::string& logName);
+	LONG GetSymMod();
 public:
 	afx_msg void OnBnClickedButtonGenKey();
 	afx_msg void OnBnClickedButtonSign();
@@ -50,4 +52,11 @@ public:
 	CEdit m_VerifyRes;
 	CEdit m_UserIDEdit;
 	CEdit m_ResultEdit;
+	afx_msg void OnBnClickedButtonSm4Encrypt();
+	afx_msg void OnBnClickedButtonSm4Decrypt();
+	CEdit m_SymKeyEdit;
+	CEdit m_SymIVEdit;
+	CEdit m_EncryptResEdit;
+	CEdit m_DecryptResEdit;
+	CComboBox m_CryptModCob;
 };

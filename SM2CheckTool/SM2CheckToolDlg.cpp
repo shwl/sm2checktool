@@ -9,6 +9,7 @@
 #include "afxdialogex.h"
 #include "TG_SM2Api.h"
 #pragma comment(lib, "TG_SM2Api.lib");
+#include "spdlog/log.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -141,6 +142,11 @@ void CSM2CheckToolDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT_VERIFYRES, m_VerifyRes);
 	DDX_Control(pDX, IDC_EDIT_USER_ID, m_UserIDEdit);
 	DDX_Control(pDX, IDC_EDIT_RESULT, m_ResultEdit);
+	DDX_Control(pDX, IDC_EDIT_SYM_KEY, m_SymKeyEdit);
+	DDX_Control(pDX, IDC_EDIT_SYM_IV, m_SymIVEdit);
+	DDX_Control(pDX, IDC_EDIT_ENCRYPT_RES, m_EncryptResEdit);
+	DDX_Control(pDX, IDC_EDIT_DECRYPT_RES, m_DecryptResEdit);
+	DDX_Control(pDX, IDC_COMBO_ENCRYPT_MOD, m_CryptModCob);
 }
 
 BEGIN_MESSAGE_MAP(CSM2CheckToolDlg, CDialogEx)
@@ -151,6 +157,8 @@ BEGIN_MESSAGE_MAP(CSM2CheckToolDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_SIGN, &CSM2CheckToolDlg::OnBnClickedButtonSign)
 	ON_BN_CLICKED(IDC_BUTTON_VERIFY, &CSM2CheckToolDlg::OnBnClickedButtonVerify)
 	ON_BN_CLICKED(IDC_BUTTON_SM3, &CSM2CheckToolDlg::OnBnClickedButtonSm3)
+	ON_BN_CLICKED(IDC_BUTTON_SM4_ENCRYPT, &CSM2CheckToolDlg::OnBnClickedButtonSm4Encrypt)
+	ON_BN_CLICKED(IDC_BUTTON_SM4_DECRYPT, &CSM2CheckToolDlg::OnBnClickedButtonSm4Decrypt)
 END_MESSAGE_MAP()
 
 
@@ -186,9 +194,18 @@ BOOL CSM2CheckToolDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
 	// TODO:  在此添加额外的初始化代码;
-	m_SrcEdit.SetWindowTextW(L"1234567812345678");
-	m_UserIDEdit.SetWindowTextW(L"1234567812345678");
-	
+	string key = "1234567812345678";
+	SetEditString(m_SrcEdit, key, "Init_Src");
+	SetEditString(m_UserIDEdit, key, "Init_UserID");
+	SetEditString(m_SymKeyEdit, key, "Init_SymKey");
+	SetEditString(m_SymIVEdit, key, "Init_SymIV");
+	wchar_t* symMod[] = {L"SGD_SM4_ECB", L"SGD_SM4_CBC", L"SGD_SM4_CFB", L"SGD_SM4_OFB", L"SGD_SM4_MAC"};
+	const int size = _countof(symMod);
+	for (int i = 0; i < size; ++i)
+	{
+		m_CryptModCob.InsertString(i, symMod[i]);
+	}
+	m_CryptModCob.SetCurSel(0);
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -251,13 +268,13 @@ void CSM2CheckToolDlg::OnBnClickedButtonGenKey()
 	if (0 == ulRes)
 	{
 		string strTmp = ESP_CharToHex(priKey.PrivateKey + KEY_OFF_SET, SM2_KEY_LEN);
-		m_PriKeyEdit.SetWindowTextW(CString(strTmp.c_str()));
+		SetEditString(m_PriKeyEdit, strTmp, "GenKey_PriKey");
 
 		strTmp = ESP_CharToHex(pubKey.XCoordinate + KEY_OFF_SET, SM2_KEY_LEN);
-		m_PubKeyXEdit.SetWindowTextW(CString(strTmp.c_str()));
+		SetEditString(m_PubKeyXEdit, strTmp, "GenKey_PubKeyX");
 
 		strTmp = ESP_CharToHex(pubKey.YCoordinate + KEY_OFF_SET, SM2_KEY_LEN);
-		m_PubKeyYEdit.SetWindowTextW(CString(strTmp.c_str()));
+		SetEditString(m_PubKeyYEdit, strTmp, "GenKey_PubKeyY");
 	}
 	ShowMessage(L"TG_GenECCKeyPair", ulRes);
 }
@@ -265,26 +282,26 @@ void CSM2CheckToolDlg::OnBnClickedButtonGenKey()
 void CSM2CheckToolDlg::OnBnClickedButtonSign()
 {
 	// TODO:  在此添加控件通知处理程序代码;
-	string strDigest = GetEditString(m_SM3ZResEdit, true);
+	string strDigest = GetEditString(m_SM3ZResEdit, true, "Sign_SM3Z");
 	if (0 == strDigest.length()){
 		OnBnClickedButtonSm3();
 	}
-	strDigest = GetEditString(m_SM3ZResEdit, true);
+	strDigest = GetEditString(m_SM3ZResEdit, true, "Sign_SM3Z");
 	if (0 < strDigest.length())
 	{
 		ECCPRIVATEKEYBLOB eccPriKeyBlob = {};
 		ECCSIGNATUREBLOB signature = {};
-		string strPriKey = GetEditString(m_PriKeyEdit, true);
+		string strPriKey = GetEditString(m_PriKeyEdit, true, "Sign_PriKey");
 		StrToPriKey(strPriKey, eccPriKeyBlob);
 		ULONG ulRes = TG_ECCSign(&eccPriKeyBlob, (BYTE*)strDigest.c_str(), strDigest.length(), &signature);
 		ShowMessage(L"TG_ECCSign", ulRes);
 		if (0 == ulRes)
 		{
 			string strTmp = ESP_CharToHex(signature.r + KEY_OFF_SET, SM2_KEY_LEN);
-			m_SignResR.SetWindowTextW(CString(strTmp.c_str()));
+			SetEditString(m_SignResR, strTmp, "Sign_R");
 
 			strTmp = ESP_CharToHex(signature.s + KEY_OFF_SET, SM2_KEY_LEN);
-			m_SignResS.SetWindowTextW(CString(strTmp.c_str()));
+			SetEditString(m_SignResS, strTmp, "Sign_S");
 		}
 	}
 	else{
@@ -295,26 +312,24 @@ void CSM2CheckToolDlg::OnBnClickedButtonSign()
 void CSM2CheckToolDlg::OnBnClickedButtonVerify()
 {
 	// TODO:  在此添加控件通知处理程序代码;
-	string strDigest = GetEditString(m_SM3ZResEdit, true);
+	string strDigest = GetEditString(m_SM3ZResEdit, true, "Verify_SM3Z");
 	if (0 == strDigest.length()){
 		OnBnClickedButtonSm3();
 	}
-	strDigest = GetEditString(m_SM3ZResEdit, true);
+	strDigest = GetEditString(m_SM3ZResEdit, true, "Verify_SM3Z");
 	if (0 < strDigest.length())
 	{
 		ECCPUBLICKEYBLOB pubKey = {};
 		ECCSIGNATUREBLOB signature = {};
-		string strX = GetEditString(m_PubKeyXEdit, true);
-		string strY = GetEditString(m_PubKeyYEdit, true);
+		string strX = GetEditString(m_PubKeyXEdit, true, "Verify_PubKeyX");
+		string strY = GetEditString(m_PubKeyYEdit, true, "Verify_PubKeyY");
 		StrToPubKey(strX, strY, pubKey);
-		string strR = GetEditString(m_SignResR, true);
-		string strS = GetEditString(m_SignResS, true);
+		string strR = GetEditString(m_SignResR, true, "Verify_SignValueR");
+		string strS = GetEditString(m_SignResS, true, "Verify_SignValueS");
 		StrToSignarure(strR, strS, signature);
 		ULONG ulRes = TG_ECCVerify(&pubKey, (BYTE*)strDigest.c_str(), strDigest.length(), &signature);
-		CString res;
-		res.Format(L"%d", ulRes);
-		m_VerifyRes.SetWindowTextW(res);
 		ShowMessage(L"TG_ECCVerify", ulRes);
+		SetEditString(m_VerifyRes, std::to_string(ulRes), "Verify_Res");
 	}
 	else{
 		ShowMessage(L"Digest is empty", -1);
@@ -335,10 +350,10 @@ void CSM2CheckToolDlg::OnBnClickedButtonSm3()
 		if (isHasZ)
 		{
 			ECCPUBLICKEYBLOB pubKey = {};
-			string strX = GetEditString(m_PubKeyXEdit, true);
-			string strY = GetEditString(m_PubKeyYEdit, true);
+			string strX = GetEditString(m_PubKeyXEdit, true, "SM3_PubKeyX");
+			string strY = GetEditString(m_PubKeyYEdit, true, "SM3_PubKeyY");
 			StrToPubKey(strX, strY, pubKey);
-			string userID = GetEditString(m_UserIDEdit, false);
+			string userID = GetEditString(m_UserIDEdit, false, "SM3_UserID");
 			ulRes = TG_DigestInit(SGD_SM3, &pubKey,
 				(BYTE*)userID.c_str(), userID.length(), &hHash);
 		}
@@ -348,7 +363,7 @@ void CSM2CheckToolDlg::OnBnClickedButtonSm3()
 		ShowMessage(L"TG_DigestInit", ulRes);
 		if (0 == ulRes)
 		{
-			string srcData = GetEditString(m_SrcEdit, false);
+			string srcData = GetEditString(m_SrcEdit, false, "SM3_Src");
 			BYTE szDigest[ECC_MAX_MODULUS_BITS_LEN] = {};
 			ULONG ulDigestLen = _countof(szDigest);
 			ulRes = TG_Digest(hHash, (BYTE*)srcData.c_str(), srcData.length(),
@@ -358,10 +373,10 @@ void CSM2CheckToolDlg::OnBnClickedButtonSm3()
 			{
 				string strTmp = ESP_CharToHex(szDigest, ulDigestLen);
 				if (isHasZ){
-					m_SM3ZResEdit.SetWindowTextW(CString(strTmp.c_str()));
+					SetEditString(m_SM3ZResEdit, strTmp, "SM3_SM3Z");
 				}
 				else{
-					m_SM3ResEdit.SetWindowTextW(CString(strTmp.c_str()));
+					SetEditString(m_SM3ResEdit, strTmp, "SM3_SM3");
 				}
 			}
 			TG_CloseHandle(hHash, 0);
@@ -388,14 +403,57 @@ void CSM2CheckToolDlg::ShowMessage(CString name, LONG errorCode,
 	m_ResultEdit.ReplaceSel(strMsg);
 }
 
-std::string CSM2CheckToolDlg::GetEditString(const CEdit& et, bool isHex)
+std::string CSM2CheckToolDlg::GetEditString(const CEdit& et, bool isHex, const std::string& logName)
 {
 	std::string strRes;
 	CString cstr;
 	et.GetWindowTextW(cstr);
 	strRes = CT2A(cstr.GetBuffer());
+	LOG_ERROR("%s:%s isHex:%d", logName.c_str(), strRes.c_str(), isHex);
 	if (isHex){
 		strRes = ESP_HexToChar(strRes);
 	}
 	return strRes;
+}
+
+void CSM2CheckToolDlg::SetEditString(CEdit& et, const std::string& text, const std::string& logName)
+{
+	CString cstr = CString(text.c_str());
+	et.SetWindowTextW(cstr);
+	LOG_ERROR("%s:%s", logName.c_str(), text.c_str());
+}
+
+LONG CSM2CheckToolDlg::GetSymMod()
+{
+	LONG lCryptMod = SGD_SM4_ECB;
+	int nIndex = m_CryptModCob.GetCurSel();
+	switch (nIndex)
+	{
+	case 1:
+		lCryptMod = SGD_SM4_CBC;
+		break;
+	case 2:
+		lCryptMod = SGD_SM4_CFB;
+		break;
+	case 3:
+		lCryptMod = SGD_SM4_OFB;
+		break;
+	case 4:
+		lCryptMod = SGD_SM4_MAC;
+	default:
+		break;
+	}
+}
+
+void CSM2CheckToolDlg::OnBnClickedButtonSm4Encrypt()
+{
+	// TODO:  在此添加控件通知处理程序代码;
+
+}
+
+
+void CSM2CheckToolDlg::OnBnClickedButtonSm4Decrypt()
+{
+	// TODO:  在此添加控件通知处理程序代码;
+
 }
