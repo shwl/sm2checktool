@@ -138,8 +138,7 @@ void CSM2CheckToolDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT_SM3_Z, m_SM3ZResEdit);
 	DDX_Control(pDX, IDC_EDIT_SIGNRES_R, m_SignResR);
 	DDX_Control(pDX, IDC_EDIT_SIGNRES_S, m_SignResS);
-	DDX_Control(pDX, IDC_EDIT_VERIFYRES_R, m_VerifyResR);
-	DDX_Control(pDX, IDC_EDIT_VERIFYRES_S, m_VerifyResS);
+	DDX_Control(pDX, IDC_EDIT_VERIFYRES, m_VerifyRes);
 	DDX_Control(pDX, IDC_EDIT_USER_ID, m_UserIDEdit);
 	DDX_Control(pDX, IDC_EDIT_RESULT, m_ResultEdit);
 }
@@ -187,8 +186,9 @@ BOOL CSM2CheckToolDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
 	// TODO:  在此添加额外的初始化代码;
+	m_SrcEdit.SetWindowTextW(L"1234567812345678");
 	m_UserIDEdit.SetWindowTextW(L"1234567812345678");
-
+	
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -311,6 +311,9 @@ void CSM2CheckToolDlg::OnBnClickedButtonVerify()
 		string strS = GetEditString(m_SignResS, true);
 		StrToSignarure(strR, strS, signature);
 		ULONG ulRes = TG_ECCVerify(&pubKey, (BYTE*)strDigest.c_str(), strDigest.length(), &signature);
+		CString res;
+		res.Format(L"%d", ulRes);
+		m_VerifyRes.SetWindowTextW(res);
 		ShowMessage(L"TG_ECCVerify", ulRes);
 	}
 	else{
@@ -345,7 +348,7 @@ void CSM2CheckToolDlg::OnBnClickedButtonSm3()
 		ShowMessage(L"TG_DigestInit", ulRes);
 		if (0 == ulRes)
 		{
-			string srcData = GetEditString(m_SrcEdit, true);
+			string srcData = GetEditString(m_SrcEdit, false);
 			BYTE szDigest[ECC_MAX_MODULUS_BITS_LEN] = {};
 			ULONG ulDigestLen = _countof(szDigest);
 			ulRes = TG_Digest(hHash, (BYTE*)srcData.c_str(), srcData.length(),

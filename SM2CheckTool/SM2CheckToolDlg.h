@@ -47,8 +47,7 @@ public:
 	CEdit m_SM3ZResEdit;
 	CEdit m_SignResR;
 	CEdit m_SignResS;
-	CEdit m_VerifyResR;
-	CEdit m_VerifyResS;
+	CEdit m_VerifyRes;
 	CEdit m_UserIDEdit;
 	CEdit m_ResultEdit;
 };
