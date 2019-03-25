@@ -19,6 +19,8 @@ using namespace std;
 
 #define SM2_KEY_LEN		32
 #define KEY_OFF_SET		(ECC_MAX_MODULUS_BITS_LEN / 8 - SM2_KEY_LEN)
+#define SM4_KEY_LEN		16
+#define SM4_IV_LEN		16
 
 std::string ESP_CharToHex(const BYTE* data, int len)
 {
@@ -194,12 +196,12 @@ BOOL CSM2CheckToolDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
 	// TODO:  在此添加额外的初始化代码;
-	string key = "1234567812345678";
+	string key = "31323334353637383132333435363738";
 	SetEditString(m_SrcEdit, key, "Init_Src");
 	SetEditString(m_UserIDEdit, key, "Init_UserID");
 	SetEditString(m_SymKeyEdit, key, "Init_SymKey");
 	SetEditString(m_SymIVEdit, key, "Init_SymIV");
-	wchar_t* symMod[] = {L"SGD_SM4_ECB", L"SGD_SM4_CBC", L"SGD_SM4_CFB", L"SGD_SM4_OFB", L"SGD_SM4_MAC"};
+	wchar_t* symMod[] = {L"SGD_SM4_ECB", L"SGD_SM4_CBC", L"SGD_SM4_CFB", L"SGD_SM4_OFB"};
 	const int size = _countof(symMod);
 	for (int i = 0; i < size; ++i)
 	{
@@ -353,7 +355,7 @@ void CSM2CheckToolDlg::OnBnClickedButtonSm3()
 			string strX = GetEditString(m_PubKeyXEdit, true, "SM3_PubKeyX");
 			string strY = GetEditString(m_PubKeyYEdit, true, "SM3_PubKeyY");
 			StrToPubKey(strX, strY, pubKey);
-			string userID = GetEditString(m_UserIDEdit, false, "SM3_UserID");
+			string userID = GetEditString(m_UserIDEdit, true, "SM3_UserID");
 			ulRes = TG_DigestInit(SGD_SM3, &pubKey,
 				(BYTE*)userID.c_str(), userID.length(), &hHash);
 		}
@@ -363,7 +365,7 @@ void CSM2CheckToolDlg::OnBnClickedButtonSm3()
 		ShowMessage(L"TG_DigestInit", ulRes);
 		if (0 == ulRes)
 		{
-			string srcData = GetEditString(m_SrcEdit, false, "SM3_Src");
+			string srcData = GetEditString(m_SrcEdit, true, "SM3_Src");
 			BYTE szDigest[ECC_MAX_MODULUS_BITS_LEN] = {};
 			ULONG ulDigestLen = _countof(szDigest);
 			ulRes = TG_Digest(hHash, (BYTE*)srcData.c_str(), srcData.length(),
@@ -423,7 +425,7 @@ void CSM2CheckToolDlg::SetEditString(CEdit& et, const std::string& text, const s
 	LOG_ERROR("%s:%s", logName.c_str(), text.c_str());
 }
 
-LONG CSM2CheckToolDlg::GetSymMod()
+LONG CSM2CheckToolDlg::GetSymMod(BLOCKCIPHERPARAM& blolparam)
 {
 	LONG lCryptMod = SGD_SM4_ECB;
 	int nIndex = m_CryptModCob.GetCurSel();
@@ -434,26 +436,103 @@ LONG CSM2CheckToolDlg::GetSymMod()
 		break;
 	case 2:
 		lCryptMod = SGD_SM4_CFB;
+		blolparam.FeedBitLen = 128;
 		break;
 	case 3:
 		lCryptMod = SGD_SM4_OFB;
 		break;
-	case 4:
-		lCryptMod = SGD_SM4_MAC;
 	default:
 		break;
 	}
+	blolparam.PaddingType = 1;
+	blolparam.IVLen = SM4_IV_LEN;
+	if (lCryptMod != SGD_SM4_ECB)
+	{
+		string symIV = GetEditString(m_SymIVEdit, true, "SymIV");
+		if (symIV.length() != SM4_IV_LEN)
+		{
+			ShowMessage(L"初始化向量长度必需是", SM4_IV_LEN);
+			return -1;
+		}
+		memcpy(blolparam.IV, symIV.c_str(), blolparam.IVLen);
+	}
+	return lCryptMod;
 }
 
 void CSM2CheckToolDlg::OnBnClickedButtonSm4Encrypt()
 {
 	// TODO:  在此添加控件通知处理程序代码;
-
+	string symKey = GetEditString(m_SymKeyEdit, true, "SM4Encrypt_SymKey");
+	if (symKey.length() != SM4_KEY_LEN)
+	{
+		ShowMessage(L"密钥长度必需是", SM2_KEY_LEN);
+		return;
+	}
+	BLOCKCIPHERPARAM blolparam = { 0 };
+	ULONG ulAlgID = GetSymMod(blolparam);
+	if (-1 == ulAlgID){
+		return;
+	}
+	HANDLE hKey = NULL;
+	LONG lRes = TG_SetSymmKey((BYTE*)symKey.c_str(), ulAlgID, &hKey);
+	ShowMessage(L"TG_SetSymmKey", lRes);
+	if (0 == lRes)
+	{
+		lRes = TG_EncryptInit(hKey, blolparam);
+		ShowMessage(L"TG_EncryptInit", lRes);
+		if (0 == lRes)
+		{
+			string src = GetEditString(m_SrcEdit, true, "SM4Encrypt_Src");
+			ULONG ulLen = src.length() + 128;
+			BYTE* pData = new BYTE[ulLen];
+			lRes = TG_Encrypt(hKey, (BYTE*)src.c_str(), src.length(), pData, &ulLen);
+			if (0 == lRes)
+			{
+				string strTmp = ESP_CharToHex(pData, ulLen);
+				SetEditString(m_EncryptResEdit, strTmp, "SM4Encrypt_Res");
+			}
+			delete[] pData;
+			ShowMessage(L"TG_Encrypt", lRes);
+		}
+		TG_CloseHandle(hKey, 0);
+	}
 }
-
 
 void CSM2CheckToolDlg::OnBnClickedButtonSm4Decrypt()
 {
 	// TODO:  在此添加控件通知处理程序代码;
-
+	string symKey = GetEditString(m_SymKeyEdit, true, "SM4Decrypt_SymKey");
+	if (symKey.length() != SM4_KEY_LEN)
+	{
+		ShowMessage(L"密钥长度必需是", SM2_KEY_LEN);
+		return;
+	}
+	BLOCKCIPHERPARAM blolparam = { 0 };
+	ULONG ulAlgID = GetSymMod(blolparam);
+	if (-1 == ulAlgID){
+		return;
+	}
+	HANDLE hKey = NULL;
+	LONG lRes = TG_SetSymmKey((BYTE*)symKey.c_str(), ulAlgID, &hKey);
+	ShowMessage(L"TG_SetSymmKey", lRes);
+	if (0 == lRes)
+	{
+		lRes = TG_DecryptInit(hKey, blolparam);
+		ShowMessage(L"TG_DecryptInit", lRes);
+		if (0 == lRes)
+		{
+			string encryptRes = GetEditString(m_EncryptResEdit, true, "SM4Decrypt_EncRes");
+			ULONG ulLen = encryptRes.length() + 128;
+			BYTE* pData = new BYTE[ulLen];
+			lRes = TG_Decrypt(hKey, (BYTE*)encryptRes.c_str(), encryptRes.length(), pData, &ulLen);
+			if (0 == lRes)
+			{
+				string strTmp = ESP_CharToHex(pData, ulLen);
+				SetEditString(m_DecryptResEdit, strTmp, "SM4Decrypt_Res");
+			}
+			delete[] pData;
+			ShowMessage(L"TG_Decrypt", lRes);
+		}
+		TG_CloseHandle(hKey, 0);
+	}
 }

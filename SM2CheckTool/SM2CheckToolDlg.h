@@ -5,6 +5,7 @@
 #pragma once
 #include "afxwin.h"
 #include <string>
+#include "openssl/skf.h"
 
 
 // CSM2CheckToolDlg ¶Ô»°¿ò
@@ -35,7 +36,7 @@ protected:
 	void ShowMessage(CString name, LONG errorCode, CString msg = L"", int flag = 0 );
 	std::string GetEditString(const CEdit& et, bool isHex, const std::string& logName);
 	void SetEditString(CEdit& et, const std::string& text, const std::string& logName);
-	LONG GetSymMod();
+	LONG GetSymMod(BLOCKCIPHERPARAM& blolparam);
 public:
 	afx_msg void OnBnClickedButtonGenKey();
 	afx_msg void OnBnClickedButtonSign();
